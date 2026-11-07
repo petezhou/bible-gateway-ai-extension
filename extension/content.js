@@ -49,7 +49,6 @@
       textarea { resize: none; display: block; width: 100%; border: 1px solid #d6ded3;
         background: white; border-radius: 10px; padding: 11px 12px; color: #23362f; min-height: 76px; }
       .actions { display: flex; align-items: center; gap: 12px; margin-top: 10px; }
-      .summary { border: 1px solid #d4ded3; border-radius: 9px; background: white; padding: 8px 11px; color: #385548; }
       .hint { flex: 1; font-size: 10px; color: #849082; text-align: right; }
       .send { border: 0; border-radius: 9px; background: #244d40; color: white; padding: 8px 15px; }
       @media (max-width: 500px) { .panel { top: 12px; right: 12px; height: calc(100dvh - 24px); } .hint { display: none; } }
@@ -67,7 +66,6 @@
       <form>
         <textarea aria-label="Question about selected verses" placeholder="What would you like to understand?" maxlength="4000"></textarea>
         <div class="actions">
-          <button class="summary" type="button">Summarize</button>
           <span class="hint">Enter to send · Shift+Enter for a new line</span>
           <button class="send" type="submit">Send</button>
         </div>
@@ -162,7 +160,7 @@
       messages.replaceChildren();
       const empty = document.createElement('p');
       empty.className = 'empty';
-      empty.textContent = 'Ask a question about these verses, or start with a summary.';
+      empty.textContent = 'Ask a question about these verses.';
       messages.append(empty);
       input.value = '';
       setStatus('');
@@ -178,7 +176,6 @@
   function setBusy(value) {
     busy = value;
     find('.send').disabled = value || !activeSelection;
-    find('.summary').disabled = value || !activeSelection;
     input.disabled = value || !activeSelection;
   }
 
@@ -218,21 +215,17 @@
     return element;
   }
 
-  async function send(endpoint) {
+  async function send() {
     if (busy || !activeSelection) return;
-    const question = endpoint === 'summary' ? 'Summarize these verses.' : input.value.trim();
+    const question = input.value.trim();
     if (!question) { input.focus(); return; }
     const currentConversation = conversation;
     const userBubble = addMessage('user', question);
     setBusy(true);
     setStatus('Reading the passage and commentary…');
     try {
-      const payload = { reference: activeSelection.reference };
-      if (endpoint === 'chat') {
-        payload.question = question;
-        payload.history = history.slice(-20);
-      }
-      const result = await chrome.runtime.sendMessage({ type: 'study', endpoint, payload });
+      const payload = { reference: activeSelection.reference, question, history: history.slice(-20) };
+      const result = await chrome.runtime.sendMessage({ type: 'study', endpoint: 'chat', payload });
       if (currentConversation !== conversation) return;
       if (!result?.ok) throw new Error(result?.error || 'No response from the extension. Reload this page.');
       addMessage('assistant', result.data.text, result.data.sources);
@@ -255,12 +248,11 @@
   ask.addEventListener('pointerdown', (event) => event.preventDefault());
   ask.addEventListener('click', openSelection);
   find('.close').addEventListener('click', () => { panel.hidden = true; });
-  find('form').addEventListener('submit', (event) => { event.preventDefault(); send('chat'); });
-  find('.summary').addEventListener('click', () => send('summary'));
+  find('form').addEventListener('submit', (event) => { event.preventDefault(); send(); });
   input.addEventListener('keydown', (event) => {
     if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
       event.preventDefault();
-      send('chat');
+      send();
     }
   });
   shadow.addEventListener('keydown', (event) => {

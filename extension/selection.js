@@ -91,5 +91,17 @@
     };
   }
 
-  window.BibleGatewayAISelection = { read };
+  function passage(table, column = table.closest('.passage-col')) {
+    const match = (table.dataset.osis || '').match(/^([1-3]?[A-Za-z]+)\.(\d+)(?:\.(\d+))?(?:-([1-3]?[A-Za-z]+)\.(\d+)\.(\d+))?$/);
+    if (!match || !BOOKS[match[1]]) return null;
+    const [, book, chapter, start, endBook, endChapter, end] = match;
+    if (endBook && (book !== endBook || chapter !== endChapter || Number(end) < Number(start))) return null;
+    const heading = column?.querySelector('.passage-display .bcv')?.textContent.trim();
+    const wholeChapter = !start || (heading && !heading.includes(':'));
+    const reference = wholeChapter ? `${book}.${chapter}` : table.dataset.osis;
+    const label = `${BOOKS[book]} ${chapter}${wholeChapter ? '' : `:${start}${end && end !== start ? `-${end}` : ''}`}`;
+    return { reference, label, heading: column?.querySelector('.passage-display') };
+  }
+
+  window.BibleGatewayAISelection = { read, passage };
 })();

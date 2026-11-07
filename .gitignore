@@ -1,5 +1,14 @@
 # Secrets
 .env
+.env.*
+!.env.example
+.envrc
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json
+service-account*.json
 
 # Build assets - public domain sources, but not redistributed from this repo
 /vendor/

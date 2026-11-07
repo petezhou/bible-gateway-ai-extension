@@ -4,6 +4,18 @@ Local Bible study backend using ESV chapter text, historic commentary, and
 Westminster Shorter Catechism context. Highlight verses on BibleGateway to open a
 chat with the local backend.
 
+## In action
+
+A study summary loads automatically beneath the passage heading, covering the
+chapter or verse range displayed on BibleGateway.
+
+![Automatic chapter summary for 1 Chronicles 25](docs/images/chapter-summary.png)
+
+Highlight verses and choose **Ask AI** to ask questions and follow up in the chat
+panel, with answers grounded in the passage and supplied commentary.
+
+![Chat about prophesying with harps in 1 Chronicles 25:1](docs/images/verse-chat.png)
+
 ## Run locally
 
 Use Python 3.11 or newer. From the project directory:
@@ -114,9 +126,12 @@ Start the backend on port 8001 (the extension's default):
 2. Click **Load unpacked** and select this project's `extension/` directory.
 3. Open or refresh a BibleGateway passage, for example
    https://www.biblegateway.com/passage/?search=John+3&version=NIV.
-4. Drag to highlight words across one or more contiguous verses in one chapter.
-5. Click **Ask AI** beside the highlight toolbar. Enter a question or click
-   **Summarize**. Use the same panel for follow-up questions.
+4. A study summary loads automatically beneath the passage heading, with a spinner
+   while the model responds. A chapter page summarizes the whole chapter; a page
+   showing specific verses summarizes only that range. Each page load makes a
+   billable Anthropic request. If it fails, use **Retry summary**.
+5. To ask questions, highlight words across contiguous verses in one chapter and
+   click **Ask AI** beside the highlight toolbar. Use the chat panel for follow-ups.
 
 Partial verse highlights include the full verses they touch. A new verse range
 starts a new conversation. Chat stays in this tab until you reload the page.

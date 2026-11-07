@@ -112,23 +112,24 @@ for (const { start, end, reference, label } of [
   });
 }
 
-test('follow-up history, summary, and a new selection', async ({ app }) => {
+test('follow-up history and a new selection', async ({ app }) => {
   // Arrange
   const { page, state } = app;
   await highlight(page, '.John-3-10', '.John-3-12');
   await page.getByRole('button', { name: 'Ask AI about highlighted verses' }).click();
 
   // Act
-  await page.getByRole('button', { name: 'Summarize', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Question about selected verses' }).fill('Explain these verses.');
+  await page.getByRole('button', { name: 'Send', exact: true }).click();
   await expect(page.locator('.message.assistant')).toHaveCount(1);
   await page.getByRole('textbox').fill('Tell me more.');
   await page.getByRole('textbox').press('Enter');
 
   // Assert
   await expect(page.locator('.message.assistant')).toHaveCount(2);
-  expect(state.requests[0].endpoint).toBe('/summary');
+  expect(state.requests[0].endpoint).toBe('/chat');
   expect(state.requests[1].body.history).toEqual([
-    { role: 'user', content: 'Summarize these verses.' },
+    { role: 'user', content: 'Explain these verses.' },
     { role: 'assistant', content: '**A sourced answer.**' },
   ]);
 
@@ -212,7 +213,8 @@ test('model Markdown is sanitized', async ({ app }) => {
   await page.getByRole('button', { name: 'Ask AI about highlighted verses' }).click();
 
   // Act
-  await page.getByRole('button', { name: 'Summarize', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Question about selected verses' }).fill('Explain these verses.');
+  await page.getByRole('button', { name: 'Send', exact: true }).click();
 
   // Assert
   await expect(page.locator('.message.assistant strong')).toHaveText('Safe text');
@@ -250,10 +252,87 @@ test('a delayed model answer stays connected', async ({ app }) => {
   await page.getByRole('button', { name: 'Ask AI about highlighted verses' }).click();
 
   // Act
-  await page.getByRole('button', { name: 'Summarize', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Question about selected verses' }).fill('Explain these verses.');
+  await page.getByRole('button', { name: 'Send', exact: true }).click();
 
   // Assert
   await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeDisabled();
   await expect(page.locator('.message.assistant')).toHaveCount(1, { timeout: 35000 });
   await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeEnabled();
+});
+
+for (const { heading, osis, reference } of [
+  { heading: 'John 3', osis: 'John.3.1-John.3.36', reference: 'John.3' },
+  { heading: 'John 3:10-12', osis: 'John.3.10-John.3.12', reference: 'John.3.10-John.3.12' },
+  { heading: 'John 3:10', osis: 'John.3.10', reference: 'John.3.10' },
+]) {
+  test(`automatic inline summary: ${heading}`, async ({ app }) => {
+    // Arrange
+    const { page, state } = app;
+    state.delay = 600;
+    state.text = '**Summary** <img src=x onerror="window.bad=true"><a href="javascript:alert(1)">Unsafe</a>';
+    await page.route('https://www.biblegateway.com/**', (route) => route.fulfill({
+      contentType: 'text/html', body: `<div class="passage-table" data-osis="${osis}"><div class="passage-col">
+        <h1 class="passage-display"><span class="bcv">${heading}</span></h1>
+        <div class="passage-text"><div>
+          <span class="text John-3-10">Sample verse text.</span>
+        </div></div></div></div>`,
+    }));
+
+    // Act
+    await page.reload();
+
+    // Assert
+    const summary = page.getByRole('region', { name: 'Passage study summary' });
+    await expect(summary).toBeVisible();
+    await expect(summary).toHaveAttribute('aria-busy', 'true');
+    await expect(summary.locator('.spinner')).toBeVisible();
+    await expect(summary.locator('.answer strong')).toHaveText('Summary');
+    await expect(summary).toHaveAttribute('aria-busy', 'false');
+    await expect(summary.locator('.spinner')).toBeHidden();
+    await expect(summary.locator('img, script, a[href^="javascript:"]')).toHaveCount(0);
+    expect(state.requests).toEqual([{ endpoint: '/summary', body: { reference } }]);
+    expect(await page.locator('.passage-display').evaluate((el) =>
+      el.nextElementSibling.classList.contains('biblegateway-ai-summary'))).toBe(true);
+    await expect(page.getByRole('button', { name: 'Summarize', exact: true })).toHaveCount(0);
+  });
+}
+
+test('inline summary retries errors and follows passage navigation', async ({ app }) => {
+  // Arrange
+  const { page, state } = app;
+  state.status = 503;
+  await page.route('https://www.biblegateway.com/**', (route) => route.fulfill({
+    contentType: 'text/html', body: `<div class="passage-table" data-osis="John.3.10-John.3.12"><div class="passage-col">
+      <h1 class="passage-display"><span class="bcv">John 3:10-12</span></h1>
+      <div class="passage-text"></div>
+    </div></div>`,
+  }));
+
+  // Act
+  await page.reload();
+
+  // Assert
+  const summary = page.getByRole('region', { name: 'Passage study summary' });
+  await expect(summary.getByRole('status')).toContainText('ANTHROPIC_API_KEY');
+  await expect(summary.locator('.spinner')).toBeHidden();
+
+  // Arrange
+  state.status = 200;
+  // Act
+  await summary.getByRole('button', { name: 'Retry summary' }).click();
+  // Assert
+  await expect(summary.locator('.answer strong')).toHaveText('A sourced answer.');
+  expect(state.requests).toHaveLength(2);
+
+  // Act
+  await page.evaluate(() => {
+    document.querySelector('.bcv').textContent = 'John 4:1';
+    document.querySelector('[data-osis]').dataset.osis = 'John.4.1';
+  });
+  // Assert
+  await expect(summary.getByRole('heading')).toHaveText('Study summary · John 4:1');
+  await expect.poll(() => state.requests.at(-1).body.reference).toBe('John.4.1');
+  await expect(summary.locator('.answer strong')).toHaveText('A sourced answer.');
+  expect(state.requests).toHaveLength(3);
 });

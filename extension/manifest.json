@@ -12,7 +12,7 @@
   "content_scripts": [
     {
       "matches": ["https://www.biblegateway.com/passage/*", "https://biblegateway.com/passage/*"],
-      "js": ["vendor/markdown.js", "selection.js", "content.js"],
+      "js": ["vendor/markdown.js", "selection.js", "content.js", "summary.js"],
       "run_at": "document_idle"
     }
   ],
