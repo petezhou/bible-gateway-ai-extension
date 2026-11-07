@@ -1,0 +1,23 @@
+# Secrets
+.env
+
+# Build assets - public domain sources, but not redistributed from this repo
+/vendor/
+backend/data/*.db
+backend/documents/*.pdf
+backend/documents/*.txt
+backend/documents/*.md
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# macOS
+.DS_Store
+
+# Extension development
+node_modules/
+test-results/
+playwright-report/

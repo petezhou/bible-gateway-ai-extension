@@ -1,0 +1,16 @@
+{
+  "name": "bible-gateway-ai-extension",
+  "private": true,
+  "scripts": {
+    "vendor:extension": "node scripts/vendor-extension.mjs",
+    "test:extension": "playwright test --config tests/extension/playwright.config.mjs"
+  },
+  "dependencies": {
+    "dompurify": "3.4.17",
+    "marked": "18.1.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.0",
+    "esbuild": "0.25.12"
+  }
+}
